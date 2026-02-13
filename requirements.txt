@@ -1,0 +1,24 @@
+# KubeWatch - Dependencies
+# Install: pip install -r requirements.txt
+
+# Kubernetes Python client
+kubernetes>=29.0.0
+
+# Web dashboard
+flask>=3.0.0
+
+# Prometheus client & queries
+prometheus-client>=0.21.0
+requests>=2.31.0
+
+# Terminal colors
+colorama>=0.4.6
+
+# YAML for K8s manifests
+pyyaml>=6.0.1
+
+# Redis for caching metrics
+redis>=5.0.0
+
+# Date handling
+python-dateutil>=2.9.0
