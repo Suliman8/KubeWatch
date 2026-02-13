@@ -18,7 +18,11 @@ let timeLabels = [];
 
 // ---- INIT ----
 document.addEventListener("DOMContentLoaded", () => {
-    initCharts();
+    if (typeof Chart !== "undefined") {
+        initCharts();
+    } else {
+        console.warn("Chart.js not loaded - charts disabled");
+    }
     fetchData();
     setInterval(fetchData, REFRESH_INTERVAL);
 });
@@ -37,7 +41,9 @@ async function fetchData() {
             renderAlerts(data.alerts);
             renderPods(data.snapshot.pods);
             renderEvents(data.snapshot.events);
-            updateCharts(data.metrics.pods);
+            if (cpuChart && memChart) {
+                updateCharts(data.metrics.pods);
+            }
         } else {
             setConnected(false, data.message);
         }
@@ -158,6 +164,12 @@ function renderPods(pods) {
             ? `<span class="pod-restarts">Restarts: ${pod.restart_count}</span>`
             : "";
 
+        // Calculate ready count from containers
+        const containers = pod.containers || [];
+        const readyCount = containers.filter(c => c.ready).length;
+        const totalCount = containers.length;
+        const readyStr = `${readyCount}/${totalCount}`;
+
         html += `
             <div class="pod-item">
                 <span class="pod-status-dot ${statusLower}"></span>
@@ -165,7 +177,7 @@ function renderPods(pods) {
                 <div class="pod-info">
                     <span>${pod.status}</span>
                     ${restartHtml}
-                    <span>${pod.ready || ""}</span>
+                    <span>${readyStr}</span>
                 </div>
             </div>
         `;
@@ -187,6 +199,7 @@ function renderEvents(events) {
 
     let html = "";
     for (const evt of recent) {
+        const timeStr = evt.age || (evt.timestamp ? formatTime(evt.timestamp) : "");
         html += `
             <div class="event-item ${evt.type}">
                 <span class="event-type ${evt.type}">${evt.type}</span>
@@ -194,7 +207,7 @@ function renderEvents(events) {
                     <span class="event-object">${esc(evt.object)}</span>
                     ${esc(evt.reason)} - ${esc(evt.message || "").substring(0, 120)}
                 </span>
-                <span class="event-time">${esc(evt.age || "")}</span>
+                <span class="event-time">${esc(timeStr)}</span>
             </div>
         `;
     }
