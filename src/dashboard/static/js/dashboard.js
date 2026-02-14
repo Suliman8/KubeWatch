@@ -10,6 +10,9 @@ const REFRESH_INTERVAL = 15000; // 15 seconds
 let cpuChart = null;
 let memChart = null;
 
+// Store latest data for detail views
+let latestData = null;
+
 // Chart data history (keep last 20 data points)
 const MAX_HISTORY = 20;
 let cpuHistory = {};
@@ -35,6 +38,7 @@ async function fetchData() {
         const data = await res.json();
 
         if (data.status === "ok") {
+            latestData = data;
             setConnected(true);
             renderStats(data);
             renderHealthScores(data.health_scores);
@@ -351,3 +355,150 @@ function formatTime(isoString) {
         return "";
     }
 }
+
+// ---- DETAIL MODAL ----
+function showDetail(type) {
+    if (!latestData) return;
+
+    const overlay = document.getElementById("modalOverlay");
+    const title = document.getElementById("modalTitle");
+    const body = document.getElementById("modalBody");
+
+    const snap = latestData.snapshot;
+
+    if (type === "pods" || type === "running") {
+        const pods = snap.pods || [];
+        const filtered = type === "running" ? pods.filter(p => p.status === "Running") : pods;
+        title.textContent = type === "running" ? `Running Pods (${filtered.length})` : `All Pods (${filtered.length})`;
+
+        let html = `<table class="detail-table">
+            <thead><tr>
+                <th>Name</th><th>Status</th><th>Ready</th><th>Restarts</th><th>IP</th><th>Node</th><th>Age</th>
+            </tr></thead><tbody>`;
+        for (const p of filtered) {
+            const containers = p.containers || [];
+            const readyCount = containers.filter(c => c.ready).length;
+            const statusClass = `status-${(p.status || "").toLowerCase()}`;
+            html += `<tr>
+                <td>${esc(p.name)}</td>
+                <td class="${statusClass}">${p.status}</td>
+                <td>${readyCount}/${containers.length}</td>
+                <td>${p.restart_count || 0}</td>
+                <td>${esc(p.ip || "-")}</td>
+                <td>${esc(p.node || "-")}</td>
+                <td>${esc(p.age || "-")}</td>
+            </tr>`;
+        }
+        html += "</tbody></table>";
+        body.innerHTML = html;
+
+    } else if (type === "nodes") {
+        const nodes = snap.nodes || [];
+        title.textContent = `Nodes (${nodes.length})`;
+
+        let html = `<table class="detail-table">
+            <thead><tr>
+                <th>Name</th><th>Status</th><th>Roles</th><th>Version</th><th>OS</th><th>Runtime</th><th>CPU</th><th>Memory</th>
+            </tr></thead><tbody>`;
+        for (const n of nodes) {
+            const statusClass = n.status === "Ready" ? "node-ready" : "node-not-ready";
+            const memGb = n.memory_allocatable ? (parseInt(n.memory_allocatable) / (1024 * 1024)).toFixed(1) + " GB" : "-";
+            html += `<tr>
+                <td>${esc(n.name)}</td>
+                <td class="${statusClass}">${esc(n.status || "-")}</td>
+                <td>${esc(n.roles || "-")}</td>
+                <td>${esc(n.kubelet_version || "-")}</td>
+                <td>${esc(n.os || "-")}</td>
+                <td>${esc(n.container_runtime || "-")}</td>
+                <td>${esc(n.cpu_capacity || "-")} cores</td>
+                <td>${memGb}</td>
+            </tr>`;
+        }
+        html += "</tbody></table>";
+        body.innerHTML = html;
+
+    } else if (type === "deployments") {
+        const deps = snap.deployments || [];
+        title.textContent = `Deployments (${deps.length})`;
+
+        let html = `<table class="detail-table">
+            <thead><tr>
+                <th>Name</th><th>Namespace</th><th>Ready</th><th>Up-to-date</th><th>Available</th><th>Age</th>
+            </tr></thead><tbody>`;
+        for (const d of deps) {
+            const readyColor = d.replicas_ready === d.replicas_desired ? "status-running" : "status-pending";
+            html += `<tr>
+                <td>${esc(d.name)}</td>
+                <td>${esc(d.namespace)}</td>
+                <td class="${readyColor}">${d.replicas_ready}/${d.replicas_desired}</td>
+                <td>${d.replicas_updated || "-"}</td>
+                <td>${d.replicas_available || 0}</td>
+                <td>${esc(d.created || "-")}</td>
+            </tr>`;
+        }
+        html += "</tbody></table>";
+        body.innerHTML = html;
+
+    } else if (type === "services") {
+        const svcs = snap.services || [];
+        title.textContent = `Services (${svcs.length})`;
+
+        let html = `<table class="detail-table">
+            <thead><tr>
+                <th>Name</th><th>Type</th><th>Cluster IP</th><th>Ports</th><th>Namespace</th>
+            </tr></thead><tbody>`;
+        for (const s of svcs) {
+            const ports = (s.ports || []).map(p => `${p.port}/${p.protocol}`).join(", ");
+            html += `<tr>
+                <td>${esc(s.name)}</td>
+                <td>${esc(s.type || "-")}</td>
+                <td>${esc(s.cluster_ip || "-")}</td>
+                <td>${esc(ports || "-")}</td>
+                <td>${esc(s.namespace || "-")}</td>
+            </tr>`;
+        }
+        html += "</tbody></table>";
+        body.innerHTML = html;
+
+    } else if (type === "alerts") {
+        const alerts = latestData.alerts || [];
+        title.textContent = `Active Alerts (${alerts.length})`;
+
+        if (alerts.length === 0) {
+            body.innerHTML = '<p class="no-data">No active alerts - cluster is healthy</p>';
+        } else {
+            let html = `<table class="detail-table">
+                <thead><tr>
+                    <th>Severity</th><th>Type</th><th>Resource</th><th>Message</th><th>Time</th>
+                </tr></thead><tbody>`;
+            for (const a of alerts) {
+                const sevClass = a.severity === "critical" ? "status-failed" :
+                                 a.severity === "warning" ? "status-pending" : "";
+                const resource = a.pod || a.deployment || a.object || "-";
+                html += `<tr>
+                    <td class="${sevClass}">${(a.severity || "").toUpperCase()}</td>
+                    <td>${esc(a.type || "-")}</td>
+                    <td>${esc(resource)}</td>
+                    <td>${esc(a.message)}</td>
+                    <td>${a.timestamp ? formatTime(a.timestamp) : "-"}</td>
+                </tr>`;
+            }
+            html += "</tbody></table>";
+            body.innerHTML = html;
+        }
+    }
+
+    overlay.classList.add("active");
+}
+
+function closeModal(event) {
+    if (event && event.target !== event.currentTarget) return;
+    document.getElementById("modalOverlay").classList.remove("active");
+}
+
+// Close modal with Escape key
+document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+        document.getElementById("modalOverlay").classList.remove("active");
+    }
+});

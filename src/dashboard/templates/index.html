@@ -26,29 +26,41 @@
 
     <!-- STATS BAR -->
     <div class="stats-bar">
-        <div class="stat-card">
+        <div class="stat-card clickable" onclick="showDetail('pods')">
             <div class="stat-value" id="totalPods">-</div>
             <div class="stat-label">Pods</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card clickable" onclick="showDetail('running')">
             <div class="stat-value" id="runningPods">-</div>
             <div class="stat-label">Running</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card clickable" onclick="showDetail('nodes')">
             <div class="stat-value" id="totalNodes">-</div>
             <div class="stat-label">Nodes</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card clickable" onclick="showDetail('deployments')">
             <div class="stat-value" id="totalDeploys">-</div>
             <div class="stat-label">Deployments</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card clickable" onclick="showDetail('services')">
             <div class="stat-value" id="totalRestarts">-</div>
             <div class="stat-label">Restarts</div>
         </div>
-        <div class="stat-card alert-stat">
+        <div class="stat-card alert-stat clickable" onclick="showDetail('alerts')">
             <div class="stat-value" id="totalAlerts">-</div>
             <div class="stat-label">Alerts</div>
+        </div>
+    </div>
+
+    <!-- DETAIL MODAL -->
+    <div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="modalTitle">Details</h2>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="modalBody">
+            </div>
         </div>
     </div>
 

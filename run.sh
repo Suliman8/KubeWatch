@@ -65,4 +65,4 @@ echo -e "${GREEN}  Press Ctrl+C to stop${NC}"
 echo -e "${GREEN}═══════════════════════════════════════════${NC}"
 echo ""
 
-python -m src.main "$@"
+python -m src.main dashboard
